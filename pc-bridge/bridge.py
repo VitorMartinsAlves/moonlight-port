@@ -8,6 +8,7 @@ import hmac
 import json
 import os
 import platform
+import re
 import secrets
 import shutil
 import signal
@@ -62,6 +63,21 @@ class BridgeState:
                 mode = "x11"
         return mode
 
+    def detect_x11_size(self) -> tuple[int, int]:
+        if self.args.capture_width and self.args.capture_height:
+            return self.args.capture_width, self.args.capture_height
+        xrandr = shutil.which("xrandr")
+        if xrandr:
+            try:
+                result = subprocess.run([xrandr, "--current"], capture_output=True, text=True, timeout=2)
+                match = re.search(r"Screen\\s+\\d+:.*?current\\s+(\\d+)\\s+x\\s+(\\d+)", result.stdout, re.S)
+                if result.returncode == 0 and match:
+                    return int(match.group(1)), int(match.group(2))
+            except (OSError, subprocess.SubprocessError):
+                pass
+        # Fallback keeps explicit user settings usable even without xrandr.
+        return self.args.capture_width or self.args.width, self.args.capture_height or self.args.height
+
     def ffmpeg_input(self) -> list[str]:
         mode = self.capture_name()
         fps = str(self.args.fps)
@@ -73,7 +89,8 @@ class BridgeState:
             display = os.environ.get("DISPLAY")
             if not display:
                 raise RuntimeError("DISPLAY não está definido. Em KDE Wayland, teste a opção pipewire ou entre numa sessão X11.")
-            return ["-f", "x11grab", "-framerate", fps, "-video_size", f"{self.args.width}x{self.args.height}", "-i", display]
+            capture_width, capture_height = self.detect_x11_size()
+            return ["-f", "x11grab", "-framerate", fps, "-video_size", f"{capture_width}x{capture_height}", "-i", display]
         if mode == "pipewire":
             source = self.args.pipewire_source or os.environ.get("MOONLIGHT_PIPEWIRE_SOURCE", "0")
             return ["-f", "pipewire", "-framerate", fps, "-video_size", f"{self.args.width}x{self.args.height}", "-i", str(source)]
@@ -105,6 +122,7 @@ class BridgeState:
                 ffmpeg, "-hide_banner", "-loglevel", "warning", "-y",
                 "-fflags", "nobuffer", *input_args,
                 "-an", "-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency",
+                "-vf", f"scale={self.args.width}:{self.args.height}:flags=fast_bilinear",
                 "-profile:v", "baseline", "-pix_fmt", "yuv420p", "-r", str(fps),
                 "-b:v", self.args.bitrate, "-maxrate", self.args.maxrate, "-bufsize", self.args.bufsize,
                 "-g", str(gop), "-keyint_min", str(gop), "-sc_threshold", "0",
@@ -310,8 +328,10 @@ def main() -> int:
     parser.add_argument("--host", default="0.0.0.0", help="Interface de rede (padrão: 0.0.0.0 para o Roku acessar)")
     parser.add_argument("--port", type=int, default=8790)
     parser.add_argument("--capture", choices=["auto", "windows", "x11", "pipewire"], default="auto")
-    parser.add_argument("--width", type=int, default=1280, help="Largura capturada; 720p reduz carga e encode delay")
-    parser.add_argument("--height", type=int, default=720, help="Altura capturada; padrão 720p")
+    parser.add_argument("--width", type=int, default=1280, help="Largura de saída do stream; padrão 720p")
+    parser.add_argument("--height", type=int, default=720, help="Altura de saída do stream; padrão 720p")
+    parser.add_argument("--capture-width", type=int, default=None, help="Largura de origem X11; por padrão detecta o tamanho virtual com xrandr")
+    parser.add_argument("--capture-height", type=int, default=None, help="Altura de origem X11; por padrão detecta o tamanho virtual com xrandr")
     parser.add_argument("--fps", type=int, default=60, help="FPS alvo, entre 10 e 60")
     parser.add_argument("--segment-seconds", type=float, default=0.5, help="Duração experimental dos segmentos HLS; não remove o buffer interno do Roku")
     parser.add_argument("--hls-list-size", type=int, default=64, help="64 segmentos de 0,5s mantêm janela de cerca de 32s para o player Roku")
@@ -326,6 +346,10 @@ def main() -> int:
         parser.error("porta deve estar entre 1 e 65535; FPS entre 10 e 60")
     if args.width < 320 or args.height < 240 or args.width % 2 or args.height % 2:
         parser.error("width/height precisam ser pares, no mínimo 320x240")
+    if (args.capture_width is None) != (args.capture_height is None):
+        parser.error("--capture-width e --capture-height devem ser usados juntos")
+    if args.capture_width is not None and (args.capture_width < 320 or args.capture_height < 240):
+        parser.error("resolução de captura deve ser pelo menos 320x240")
     if not 0.25 <= args.segment_seconds <= 4.0:
         parser.error("--segment-seconds deve estar entre 0.25 e 4.0")
     if not 2 <= args.hls_list_size <= 180:
