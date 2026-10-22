@@ -1,0 +1,35 @@
+name: Validate Roku bridge
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check Python syntax and CLI
+        run: |
+          python -m py_compile pc-bridge/bridge.py
+          python pc-bridge/bridge.py --help
+      - name: Validate Roku XML
+        run: |
+          python - <<'PY'
+          import xml.etree.ElementTree as ET
+          ET.parse("roku-channel/components/MainScene.xml")
+          print("SceneGraph XML parsed successfully")
+          PY
+      - name: Validate required sideload files
+        run: |
+          test -f roku-channel/manifest
+          test -f roku-channel/source/main.brs
+          test -f roku-channel/source/MainScene.brs
+          test -f roku-channel/images/icon_hd.png
