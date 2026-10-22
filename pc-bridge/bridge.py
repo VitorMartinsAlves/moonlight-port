@@ -70,7 +70,7 @@ class BridgeState:
         if xrandr:
             try:
                 result = subprocess.run([xrandr, "--current"], capture_output=True, text=True, timeout=2)
-                match = re.search(r"Screen\\s+\\d+:.*?current\\s+(\\d+)\\s+x\\s+(\\d+)", result.stdout, re.S)
+                match = re.search(r"Screen\s+\d+:.*?current\s+(\d+)\s+x\s+(\d+)", result.stdout, re.S)
                 if result.returncode == 0 and match:
                     return int(match.group(1)), int(match.group(2))
             except (OSError, subprocess.SubprocessError):
