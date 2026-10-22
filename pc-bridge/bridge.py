@@ -256,7 +256,12 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/status":
             self._json(200, {"ok": True, "name": "Moonlight Roku Bridge", "capture": state.capture_name(),
                              "streaming": state.running, "platform": platform.system(),
-                             "inputBackend": state.args.input_backend, "error": state.last_error})
+                             "inputBackend": state.args.input_backend, "width": state.args.width,
+                             "height": state.args.height, "fps": state.args.fps,
+                             "segmentSeconds": state.args.segment_seconds,
+                             "playlistSegments": state.args.hls_list_size,
+                             "bitrate": state.args.bitrate, "maxrate": state.args.maxrate,
+                             "error": state.last_error})
             return
         if path.startswith("/stream/"):
             name = path.removeprefix("/stream/")
@@ -309,7 +314,7 @@ def main() -> int:
     parser.add_argument("--height", type=int, default=720, help="Altura capturada; padrão 720p")
     parser.add_argument("--fps", type=int, default=60, help="FPS alvo, entre 10 e 60")
     parser.add_argument("--segment-seconds", type=float, default=0.5, help="Duração experimental dos segmentos HLS; não remove o buffer interno do Roku")
-    parser.add_argument("--hls-list-size", type=int, default=3, help="Quantidade de segmentos no manifesto")
+    parser.add_argument("--hls-list-size", type=int, default=64, help="64 segmentos de 0,5s mantêm janela de cerca de 32s para o player Roku")
     parser.add_argument("--bitrate", default="5000k", help="Bitrate de vídeo H.264")
     parser.add_argument("--maxrate", default="6000k", help="Teto de bitrate")
     parser.add_argument("--bufsize", default="1000k", help="Buffer VBV do encoder; menor reduz latência do encoder, mas pode reduzir qualidade")
@@ -323,8 +328,8 @@ def main() -> int:
         parser.error("width/height precisam ser pares, no mínimo 320x240")
     if not 0.25 <= args.segment_seconds <= 4.0:
         parser.error("--segment-seconds deve estar entre 0.25 e 4.0")
-    if not 2 <= args.hls_list_size <= 10:
-        parser.error("--hls-list-size deve estar entre 2 e 10")
+    if not 2 <= args.hls_list_size <= 180:
+        parser.error("--hls-list-size deve estar entre 2 e 180")
     global state
     state = BridgeState(args)
     server = ThreadingHTTPServer((args.host, args.port), Handler)
@@ -340,6 +345,8 @@ def main() -> int:
     print(f"Endereço: http://{ip_text}:{args.port} (se houver várias interfaces, use o IP da LAN)")
     print(f"PIN de pareamento: {state.pin}")
     print(f"Captura selecionada: {state.capture_name()} | entrada: {args.input_backend}")
+    print(f"Perfil experimental: {args.width}x{args.height}@{args.fps} FPS, HLS {args.segment_seconds:g}s, janela {args.hls_list_size} segmentos, bitrate {args.bitrate} (máx. {args.maxrate})")
+    print("A Roku pode manter pelo menos ~30s de distância do live edge; isto só reduz a parte de captura/encode/segmentação.")
     print("Pressione Ctrl+C para encerrar. Mantenha o PC e a Roku na mesma LAN confiável.\n")
     try:
         server.serve_forever(poll_interval=0.3)
