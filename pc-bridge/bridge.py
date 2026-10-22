@@ -98,14 +98,23 @@ class BridgeState:
                 self.last_error = str(exc)
                 return False, self.last_error
             fps = self.args.fps
+            # Fixed GOP must align with the target segment duration, otherwise HLS
+            # waits for the next keyframe and silently produces longer segments.
+            gop = max(1, round(fps * self.args.segment_seconds))
             output = [
                 ffmpeg, "-hide_banner", "-loglevel", "warning", "-y",
-                *input_args,
+                "-fflags", "nobuffer", *input_args,
                 "-an", "-c:v", "libx264", "-preset", "ultrafast", "-tune", "zerolatency",
                 "-profile:v", "baseline", "-pix_fmt", "yuv420p", "-r", str(fps),
-                "-g", str(fps), "-keyint_min", str(fps), "-sc_threshold", "0",
-                "-f", "hls", "-hls_time", str(self.args.segment_seconds), "-hls_list_size", "5",
-                "-hls_delete_threshold", "2", "-hls_flags", "delete_segments+omit_endlist+independent_segments",
+                "-b:v", self.args.bitrate, "-maxrate", self.args.maxrate, "-bufsize", self.args.bufsize,
+                "-g", str(gop), "-keyint_min", str(gop), "-sc_threshold", "0",
+                "-force_key_frames", f"expr:gte(t,n_forced*{self.args.segment_seconds})",
+                "-flush_packets", "1",
+                "-f", "hls", "-hls_time", str(self.args.segment_seconds),
+                "-hls_list_size", str(self.args.hls_list_size),
+                "-hls_delete_threshold", "1",
+                "-hls_flags", "delete_segments+omit_endlist+independent_segments+program_date_time+temp_file",
+                "-hls_allow_cache", "0",
                 "-hls_segment_filename", str(STREAM_DIR / "seg_%06d.ts"), str(STREAM_DIR / "live.m3u8")
             ]
             try:
@@ -296,16 +305,26 @@ def main() -> int:
     parser.add_argument("--host", default="0.0.0.0", help="Interface de rede (padrão: 0.0.0.0 para o Roku acessar)")
     parser.add_argument("--port", type=int, default=8790)
     parser.add_argument("--capture", choices=["auto", "windows", "x11", "pipewire"], default="auto")
-    parser.add_argument("--width", type=int, default=1920)
-    parser.add_argument("--height", type=int, default=1080)
-    parser.add_argument("--fps", type=int, default=30)
-    parser.add_argument("--segment-seconds", type=float, default=1.0)
+    parser.add_argument("--width", type=int, default=1280, help="Largura capturada; 720p reduz carga e encode delay")
+    parser.add_argument("--height", type=int, default=720, help="Altura capturada; padrão 720p")
+    parser.add_argument("--fps", type=int, default=60, help="FPS alvo, entre 10 e 60")
+    parser.add_argument("--segment-seconds", type=float, default=0.5, help="Duração experimental dos segmentos HLS; não remove o buffer interno do Roku")
+    parser.add_argument("--hls-list-size", type=int, default=3, help="Quantidade de segmentos no manifesto")
+    parser.add_argument("--bitrate", default="5000k", help="Bitrate de vídeo H.264")
+    parser.add_argument("--maxrate", default="6000k", help="Teto de bitrate")
+    parser.add_argument("--bufsize", default="1000k", help="Buffer VBV do encoder; menor reduz latência do encoder, mas pode reduzir qualidade")
     parser.add_argument("--ffmpeg", default="ffmpeg")
     parser.add_argument("--pipewire-source", default=None, help="ID do node PipeWire; depende da compilação do FFmpeg e do desktop")
     parser.add_argument("--input-backend", choices=["auto", "xdotool", "ydotool", "none"], default="auto")
     args = parser.parse_args()
     if args.port < 1 or args.port > 65535 or args.fps < 10 or args.fps > 60:
         parser.error("porta deve estar entre 1 e 65535; FPS entre 10 e 60")
+    if args.width < 320 or args.height < 240 or args.width % 2 or args.height % 2:
+        parser.error("width/height precisam ser pares, no mínimo 320x240")
+    if not 0.25 <= args.segment_seconds <= 4.0:
+        parser.error("--segment-seconds deve estar entre 0.25 e 4.0")
+    if not 2 <= args.hls_list_size <= 10:
+        parser.error("--hls-list-size deve estar entre 2 e 10")
     global state
     state = BridgeState(args)
     server = ThreadingHTTPServer((args.host, args.port), Handler)
