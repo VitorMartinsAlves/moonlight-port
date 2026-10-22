@@ -12,6 +12,8 @@ sub init()
     m.btnPair = m.top.findNode("btnPair")
     m.btnStart = m.top.findNode("btnStart")
     m.btnStop = m.top.findNode("btnStop")
+    m.video.observeField("streamingSegment", "onSegment")
+    m.video.observeField("state", "onVideoState")
 
     m.registry = CreateObject("roRegistrySection", "MoonlightRokuBridge")
     m.pcAddress = ""
@@ -222,6 +224,25 @@ sub sendInput(keyName as String, action as String)
     if m.token = "" then return
     payload = { "key": keyName, "action": action }
     result = apiRequest("/api/input", "POST", payload, true)
+end sub
+
+sub onSegment()
+    segment = m.video.streamingSegment
+    if segment <> invalid and segment.DoesExist("latency") then
+        # Roku reports segment distance from the live edge, not full
+        # glass-to-glass input latency. Showing it makes buffering visible.
+        delayText = Trim(StrI(segment.latency))
+        m.streamHint.text = "BACK: voltar ao menu | Controles por teclado | Distância do live edge: " + delayText + " ms"
+    end if
+end sub
+
+sub onVideoState()
+    videoState = m.video.state
+    if videoState = "error" then
+        errorText = "Erro no player Roku"
+        if m.video.errorMsg <> invalid and m.video.errorMsg <> "" then errorText = m.video.errorMsg
+        m.streamHint.text = errorText + " | BACK: voltar"
+    end if
 end sub
 
 function onKeyEvent(key as String, press as Boolean) as Boolean
