@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component name="MainScene" extends="Scene">
+    <script type="text/brightscript" uri="pkg:/source/MainScene.brs" />
+    <children>
+        <Rectangle id="background" width="1280" height="720" color="0xFF0B1020" />
+        <Video id="streamVideo" width="1280" height="720" translation="[0,0]" visible="false" />
+        <Rectangle id="shade" translation="[70,45]" width="560" height="625" color="0xFF131D32" opacity="0.97" />
+        <Label id="title" translation="[105,75]" width="500" height="58" text="MOONLIGHT  /  ROKU" color="0xFFF4F7FF" font="font:LargeSystemFont" />
+        <Label id="subtitle" translation="[108,132]" width="490" height="35" text="PC streaming bridge · experimental" color="0xFF8EB7FF" font="font:MediumSystemFont" />
+        <Label id="status" translation="[108,180]" width="480" height="70" wrap="true" text="Configure o IP do PC e conecte ao bridge." color="0xFFD4DCEF" font="font:MediumSystemFont" />
+        <Button id="btnAddress" translation="[110,275]" width="470" height="58" text="1. Configurar IP do PC" />
+        <Button id="btnConnect" translation="[110,345]" width="470" height="58" text="2. Testar conexão" />
+        <Button id="btnPair" translation="[110,415]" width="470" height="58" text="3. Parear com PIN" />
+        <Button id="btnStart" translation="[110,485]" width="470" height="58" text="4. Iniciar transmissão" />
+        <Button id="btnStop" translation="[110,555]" width="470" height="58" text="Parar transmissão" />
+        <Label id="hint" translation="[710,570]" width="500" height="80" wrap="true" text="Aviso: HLS tem mais latência que Moonlight nativo. O controle usa as setas e OK do controle Roku; não há suporte a gamepad analógico." color="0xFFC2CBDA" font="font:SmallSystemFont" />
+        <Label id="streamHint" translation="[38,22]" width="700" height="36" text="BACK: voltar ao menu · PLAY: espaço · REWIND: ESC" color="0xFFFFFFFF" font="font:SmallSystemFont" visible="false" />
+    </children>
+</component>
