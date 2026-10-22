@@ -13,7 +13,7 @@
         <Button id="btnPair" translation="[110,415]" width="470" height="58" text="3. Parear com PIN" />
         <Button id="btnStart" translation="[110,485]" width="470" height="58" text="4. Iniciar transmissão" />
         <Button id="btnStop" translation="[110,555]" width="470" height="58" text="Parar transmissão" />
-        <Label id="hint" translation="[710,570]" width="500" height="80" wrap="true" text="Aviso: HLS tem mais latência que Moonlight nativo. O controle usa as setas e OK do controle Roku; não há suporte a gamepad analógico." color="0xFFC2CBDA" font="font:SmallSystemFont" />
+        <Label id="hint" translation="[710,570]" width="500" height="80" wrap="true" text="Perfil experimental 720p60/HLS 0,5s. O player Roku pode manter ~30s de atraso em streams ao vivo; não é adequado para jogos competitivos. Sem áudio/gamepad analógico." color="0xFFC2CBDA" font="font:SmallSystemFont" />
         <Label id="streamHint" translation="[38,22]" width="700" height="36" text="BACK: voltar ao menu · PLAY: espaço · REWIND: ESC" color="0xFFFFFFFF" font="font:SmallSystemFont" visible="false" />
     </children>
 </component>
